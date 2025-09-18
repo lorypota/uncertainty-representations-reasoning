@@ -119,6 +119,72 @@ def latex_jdf_table(points, centers):
     print()
 
 
+def plot_jdf_contours(centers, points=None, figsize=(8, 6)):
+    """Plot contour lines of the Joint Distance Function"""
+    
+    # Create a grid of points
+    x = np.linspace(-0.5, 5.5, 100)
+    y = np.linspace(-0.5, 4.5, 100)
+    X, Y = np.meshgrid(x, y)
+    
+    # Calculate JDF for each point in the grid
+    Z = np.zeros_like(X)
+    
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            point = np.array([X[i, j], Y[i, j]])
+            
+            # Calculate distances to all centers
+            distances = [np.linalg.norm(point - center) for center in centers]
+            d1, d2, d3 = distances
+            
+            # Avoid division by zero by adding small epsilon
+            d1 = max(d1, 1e-10)
+            d2 = max(d2, 1e-10) 
+            d3 = max(d3, 1e-10)
+            
+            # Calculate JDF using the 3-cluster formula
+            numerator = d1 * d2 * d3
+            denominator = d1*d2 + d1*d3 + d2*d3
+            Z[i, j] = numerator / denominator
+    
+    # Create the plot
+    plt.figure(figsize=figsize)
+    
+    # Create contour lines
+    contour_levels = np.linspace(Z.min(), Z.max(), 20)
+    contours = plt.contour(X, Y, Z, levels=contour_levels, colors='black', linewidths=0.8)
+    
+    # Add contour labels
+    plt.clabel(contours, inline=True, fontsize=8, fmt='%.3f')
+    
+    # Add cluster centers
+    plt.scatter(centers[:, 0], centers[:, 1], c=['red', 'blue', 'green'], 
+               s=200, marker='s', edgecolor='black', zorder=5)
+    
+    # Add data points if provided
+    if points is not None:
+        plt.scatter(points[:, 0], points[:, 1], c='black', s=40, 
+                   alpha=0.8, zorder=4)
+        
+        # Label points
+        for i, (x, y) in enumerate(points):
+            plt.annotate(f'P{i+1}', (x, y), xytext=(5, 5), 
+                        textcoords='offset points', fontsize=9, fontweight='bold')
+    
+    # Set plot properties
+    plt.xlim(-0.5, 5.5)
+    plt.ylim(-0.5, 4.5)
+    plt.grid(True, alpha=0.3)
+    
+    # Force ticks
+    plt.xticks(np.arange(-0.5, 6, 0.5))
+    plt.yticks(np.arange(-0.5, 5, 0.5))
+    
+    plt.tight_layout()
+    plt.show()
+
+
 def main():
     # Example 1
     latex_distances_table(points, centers)
@@ -126,5 +192,6 @@ def main():
 
     # Example 2
     latex_jdf_table(points, centers)
+    plot_jdf_contours(centers, points)
     
 main()
