@@ -232,6 +232,158 @@ def latex_center_update_table(points, centers, example_cluster=0):
     return new_center
 
 
+def run_algorithm_example(points, centers, max_iterations=100, tolerance=1e-4, show_plot=True):
+    """Run the complete probabilistic clustering algorithm starting from given centers"""
+    current_centers = centers.copy().astype(float)
+    centers_history = [current_centers.copy()]  # Store history for plotting
+    
+    for iteration in range(max_iterations):
+        # Step 1 & 2: Calculate new centers using the algorithm
+        new_centers = np.zeros_like(current_centers)
+        
+        for k in range(len(current_centers)):  # For each cluster
+            weights = []
+            weighted_points = []
+            
+            for i, point in enumerate(points):  # For each data point
+                # Calculate distances to all current centers
+                distances = [np.linalg.norm(point - center) for center in current_centers]
+                
+                # Calculate probabilities using inverse distance rule
+                inv_distances = [1/max(d, 1e-10) for d in distances]  # Avoid division by zero
+                sum_inv = sum(inv_distances)
+                probabilities = [inv_d / sum_inv for inv_d in inv_distances]
+                
+                # Calculate weight u_k for cluster k
+                prob_k = probabilities[k]
+                dist_k = max(distances[k], 1e-10)  # Avoid division by zero
+                weight_k = (prob_k ** 2) / dist_k
+                
+                weights.append(weight_k)
+                weighted_points.append(weight_k * point)
+            
+            # Update center k using weighted average
+            sum_weights = sum(weights)
+            new_centers[k] = np.sum(weighted_points, axis=0) / sum_weights
+        
+        # Step 3: Check convergence
+        center_movements = [np.linalg.norm(new_centers[k] - current_centers[k]) 
+                          for k in range(len(current_centers))]
+        total_movement = sum(center_movements)
+        
+        # Store centers history
+        centers_history.append(new_centers.copy())
+        
+        # Update centers
+        current_centers = new_centers.copy()
+        
+        # Check convergence
+        if total_movement < tolerance:
+            break
+    
+    # Plot the algorithm convergence
+    if show_plot:
+        plot_algorithm_convergence(points, centers_history)
+    
+    print(r"\begin{table}[h!]")
+    print(r"\centering")
+    print(r"\begin{tabular}{c|ccc}")
+    print(r"\textbf{Point} & $p_1$ & $p_2$ & $p_3$ \\")
+    print(r"\hline")
+    
+    for i, point in enumerate(points):
+        # Calculate final distances and probabilities
+        distances = [np.linalg.norm(point - center) for center in current_centers]
+        inv_distances = [1/max(d, 1e-10) for d in distances]
+        sum_inv = sum(inv_distances)
+        probabilities = [inv_d / sum_inv for inv_d in inv_distances]
+        
+        print(f"$\\mathbf{{x}}_{{{i+1}}}$ & {probabilities[0]:.3f} & {probabilities[1]:.3f} & {probabilities[2]:.3f} \\\\")
+    
+    print(r"\end{tabular}")
+    print(r"\caption{Final membership probabilities after convergence.}")
+    print(r"\label{tab:final_probabilities}")
+    print(r"\end{table}")
+    print()
+    
+    return current_centers, centers_history
+
+
+def plot_algorithm_convergence(points, centers_history):
+    """Plot the convergence of the algorithm showing center movement"""
+    
+    plt.figure(figsize=(10, 8))
+    
+    # Plot data points
+    plt.scatter(points[:, 0], points[:, 1], c='black', s=60, 
+               label='Data Points', alpha=0.7, zorder=3)
+    
+    # Label data points
+    for i, (x, y) in enumerate(points):
+        plt.annotate(f'P{i+1}', (x, y), xytext=(5, 5), 
+                    textcoords='offset points', fontsize=10)
+    
+    # Colors for clusters
+    colors = ['red', 'blue', 'green']
+    cluster_labels = ['Cluster 1', 'Cluster 2', 'Cluster 3']
+    
+    # Plot center trajectories
+    for k in range(3):  # For each cluster
+        # Extract path for cluster k
+        path_x = [centers_history[i][k][0] for i in range(len(centers_history))]
+        path_y = [centers_history[i][k][1] for i in range(len(centers_history))]
+        
+        # Plot initial center
+        plt.scatter(path_x[0], path_y[0], c=colors[k], s=200, marker='s', 
+                   edgecolor='black', linewidth=2, alpha=0.7, zorder=4,
+                   label=f'{cluster_labels[k]} (Initial)' if k == 0 else "")
+        
+        # Plot final center
+        plt.scatter(path_x[-1], path_y[-1], c=colors[k], s=200, marker='o', 
+                   edgecolor='black', linewidth=2, zorder=5)
+        
+        # Plot path if there's movement
+        if len(path_x) > 1:
+            plt.plot(path_x, path_y, color=colors[k], linestyle='--', 
+                    linewidth=2, alpha=0.8, zorder=2)
+            
+            # Add arrows to show direction
+            for i in range(len(path_x) - 1):
+                dx = path_x[i+1] - path_x[i]
+                dy = path_y[i+1] - path_y[i]
+                if abs(dx) > 1e-6 or abs(dy) > 1e-6:  # Only draw if there's movement
+                    plt.arrow(path_x[i], path_y[i], dx, dy, 
+                             head_width=0.05, head_length=0.05, 
+                             fc=colors[k], ec=colors[k], alpha=0.7, zorder=2)
+        
+        # Label centers
+        plt.annotate(f'C{k+1}', (path_x[-1], path_y[-1]), xytext=(5, 5), 
+                    textcoords='offset points', fontsize=12, fontweight='bold',
+                    color=colors[k])
+    
+    # Create custom legend
+    legend_elements = [
+        plt.scatter([], [], c='black', s=60, alpha=0.7, label='Data Points'),
+        plt.scatter([], [], c='gray', s=200, marker='s', edgecolor='black', 
+                   alpha=0.7, label='Initial Centers'),
+        plt.scatter([], [], c='gray', s=200, marker='o', edgecolor='black', 
+                   label='Final Centers'),
+        plt.Line2D([0], [0], color='gray', linestyle='--', linewidth=2, 
+                  label='Center Movement')
+    ]
+    
+    plt.grid(True, alpha=0.3)
+    plt.xlim(-0.2, 5.2)
+    plt.ylim(-0.2, 4.2)
+    
+    # Force ticks every 0.5 on both axes
+    plt.xticks(np.arange(0, 5.5, 0.5))
+    plt.yticks(np.arange(0, 4.5, 0.5))
+    
+    plt.tight_layout()
+    plt.show()
+
+
 def main():
     # Example 1
     latex_distances_table(points, centers)
@@ -243,4 +395,8 @@ def main():
     
     # Example 3
     latex_center_update_table(points, centers, example_cluster=0)
+    
+    # Example 4
+    run_algorithm_example(points, centers)
+
 main()
