@@ -185,6 +185,53 @@ def plot_jdf_contours(centers, points=None, figsize=(8, 6)):
     plt.show()
 
 
+def latex_center_update_table(points, centers, example_cluster=0):
+    """Calculate center update weights for first cluster"""
+    print(r"\begin{table}[h!]")
+    print(r"\centering")
+    print(r"\begin{tabular}{c|ccc|c|c}")
+    print(f"\\textbf{{Point}} & $p_{example_cluster+1}$ & $d_{example_cluster+1}$ & $u_{example_cluster+1}$ & $u_{example_cluster+1} \\mathbf{{x}}_i$ \\\\")
+    print(r"\hline")
+    
+    weights = []
+    weighted_points = []
+    
+    for i, point in enumerate(points):
+        # Calculate distances and probabilities
+        distances = [np.linalg.norm(point - center) for center in centers]
+        inv_distances = [1/d for d in distances]
+        sum_inv = sum(inv_distances)
+        probabilities = [inv_d / sum_inv for inv_d in inv_distances]
+        
+        # Calculate weight u_k for this cluster
+        prob_k = probabilities[example_cluster]
+        dist_k = distances[example_cluster]
+        weight_k = (prob_k ** 2) / dist_k
+        
+        # Calculate weighted point
+        weighted_point = weight_k * point
+        
+        weights.append(weight_k)
+        weighted_points.append(weighted_point)
+        
+        print(f"$\\mathbf{{x}}_{{{i+1}}}$ & {prob_k:.3f} & {dist_k:.3f} & {weight_k:.3f} & $({weighted_point[0]:.3f}, {weighted_point[1]:.3f})$ \\\\")
+    
+    print(r"\hline")
+    
+    # Calculate new center
+    sum_weights = sum(weights)
+    new_center = np.sum(weighted_points, axis=0) / sum_weights
+    
+    print(f"\\multicolumn{{4}}{{r|}}{{Sum of weights:}} & {sum_weights:.3f} \\\\")
+    print(r"\end{tabular}")
+    print(f"\\caption{{Center update calculation for cluster {example_cluster+1}.}}")
+    print(f"\\label{{tab:center_update_example{example_cluster+1}}}")
+    print(r"\end{table}")
+    print()
+    
+    return new_center
+
+
 def main():
     # Example 1
     latex_distances_table(points, centers)
@@ -194,4 +241,6 @@ def main():
     latex_jdf_table(points, centers)
     plot_jdf_contours(centers, points)
     
+    # Example 3
+    latex_center_update_table(points, centers, example_cluster=0)
 main()
